@@ -5,20 +5,22 @@ import Lenis from 'lenis'
 
 gsap.registerPlugin(ScrollTrigger)
 
+const asset = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`
+
 const PHOTOS = {
-  hero: '/photos/IMG_0153.jpg',
-  tools: '/photos/IMG_0202.jpg',
-  bathHappy: '/photos/IMG_0098.jpg',
-  bathAussie: '/photos/IMG_0273.jpg',
-  wetDog: '/photos/IMG_0256.jpg',
-  cat: '/photos/IMG_0384.jpg',
-  wetCat: '/photos/IMG_0365.jpg',
-  fur: '/photos/IMG_0229.jpg',
-  fluff: '/photos/IMG_0139.jpg',
-  close: '/photos/IMG_0347.jpg',
-  table: '/photos/IMG_0180.jpg',
-  result: '/photos/IMG_0280.jpg',
-  punch: '/photos/IMG_0277.jpg',
+  hero: asset('photos/IMG_0153.jpg'),
+  tools: asset('photos/IMG_0202.jpg'),
+  bathHappy: asset('photos/IMG_0098.jpg'),
+  bathAussie: asset('photos/IMG_0273.jpg'),
+  wetDog: asset('photos/IMG_0256.jpg'),
+  cat: asset('photos/IMG_0384.jpg'),
+  wetCat: asset('photos/IMG_0365.jpg'),
+  fur: asset('photos/IMG_0229.jpg'),
+  fluff: asset('photos/IMG_0139.jpg'),
+  close: asset('photos/IMG_0347.jpg'),
+  table: asset('photos/IMG_0180.jpg'),
+  result: asset('photos/IMG_0280.jpg'),
+  punch: asset('photos/IMG_0277.jpg'),
 } as const
 
 const GALLERY = [
