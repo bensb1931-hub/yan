@@ -87,21 +87,36 @@ const SERVICES = [
   },
 ]
 
+const SECTIONS = [
+  { id: 'top', label: 'Старт', num: '01' },
+  { id: 'manifesto', label: 'Манифест', num: '02' },
+  { id: 'process', label: 'Процесс', num: '03' },
+  { id: 'gallery', label: 'Работы', num: '04' },
+  { id: 'services', label: 'Услуги', num: '05' },
+  { id: 'book', label: 'Запись', num: '06' },
+] as const
+
 function App() {
   const rootRef = useRef<HTMLDivElement>(null)
+  const lenisRef = useRef<Lenis | null>(null)
 
   useEffect(() => {
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    const finePointer = window.matchMedia('(pointer: fine)').matches
+    const root = rootRef.current
+    if (!root) return
+
     const ctx = gsap.context(() => {
-      let lenis: Lenis | null = null
       let rafId = 0
+      let lenis: Lenis | null = null
 
       if (!reduced) {
         lenis = new Lenis({
-          duration: 1.15,
+          duration: 1.2,
           smoothWheel: true,
-          touchMultiplier: 1.1,
+          touchMultiplier: 1.05,
         })
+        lenisRef.current = lenis
         lenis.on('scroll', ScrollTrigger.update)
         const raf = (time: number) => {
           lenis?.raf(time)
@@ -110,19 +125,119 @@ function App() {
         rafId = requestAnimationFrame(raf)
       }
 
-      // ——— Hero enter ———
-      const heroIntro = gsap.timeline({ defaults: { ease: 'power3.out' } })
+      const scrollToId = (id: string) => {
+        const el = document.getElementById(id)
+        if (!el) return
+        if (lenis) {
+          lenis.scrollTo(el, { offset: 0, duration: 1.35 })
+        } else {
+          el.scrollIntoView({ behavior: 'smooth' })
+        }
+      }
+
+      // Smooth in-page links
+      const onClick = (e: MouseEvent) => {
+        const a = (e.target as HTMLElement).closest('a[href^="#"]') as HTMLAnchorElement | null
+        if (!a) return
+        const id = a.getAttribute('href')?.slice(1)
+        if (!id) return
+        e.preventDefault()
+        scrollToId(id)
+      }
+      root.addEventListener('click', onClick)
+
+      // ——— Cursor + 3D gold spotlight ———
+      const cursor = root.querySelector<HTMLElement>('.cursor')
+      const spotlight = root.querySelector<HTMLElement>('.spotlight')
+      const progressFill = root.querySelector<HTMLElement>('.progress__fill')
+      const sideLinks = gsap.utils.toArray<HTMLElement>('.side-nav__link')
+
+      let mx = window.innerWidth / 2
+      let my = window.innerHeight / 2
+      let cx = mx
+      let cy = my
+
+      const onMove = (e: PointerEvent) => {
+        mx = e.clientX
+        my = e.clientY
+        root.style.setProperty('--mx', `${mx}px`)
+        root.style.setProperty('--my', `${my}px`)
+
+        const nx = (mx / window.innerWidth - 0.5) * 2
+        const ny = (my / window.innerHeight - 0.5) * 2
+        root.style.setProperty('--tilt-x', `${(-ny * 3.5).toFixed(2)}deg`)
+        root.style.setProperty('--tilt-y', `${(nx * 4.5).toFixed(2)}deg`)
+      }
+
+      let cursorRaf = 0
+      if (finePointer && !reduced) {
+        document.documentElement.classList.add('has-cursor')
+        window.addEventListener('pointermove', onMove, { passive: true })
+
+        const tickCursor = () => {
+          cx += (mx - cx) * 0.22
+          cy += (my - cy) * 0.22
+          if (cursor) {
+            cursor.style.transform = `translate3d(${cx}px, ${cy}px, 0)`
+          }
+          if (spotlight) {
+            spotlight.style.transform = `translate3d(${cx}px, ${cy}px, 0)`
+          }
+          cursorRaf = requestAnimationFrame(tickCursor)
+        }
+        cursorRaf = requestAnimationFrame(tickCursor)
+
+        root.querySelectorAll('a, button, .gallery__item, .services__item').forEach((el) => {
+          el.addEventListener('pointerenter', () => cursor?.classList.add('is-hot'))
+          el.addEventListener('pointerleave', () => cursor?.classList.remove('is-hot'))
+        })
+      }
+
+      // ——— Scroll progress + active section ———
+      const setActive = (id: string) => {
+        sideLinks.forEach((link) => {
+          link.classList.toggle('is-active', link.dataset.section === id)
+        })
+      }
+
+      ScrollTrigger.create({
+        start: 0,
+        end: 'max',
+        onUpdate: (self) => {
+          if (progressFill) {
+            progressFill.style.transform = `scaleX(${self.progress})`
+          }
+        },
+      })
+
+      SECTIONS.forEach((s) => {
+        const el = document.getElementById(s.id)
+        if (!el) return
+        ScrollTrigger.create({
+          trigger: el,
+          start: 'top center',
+          end: 'bottom center',
+          onEnter: () => setActive(s.id),
+          onEnterBack: () => setActive(s.id),
+        })
+      })
+      setActive('top')
+
+      // ——— Hero enter + luxury shimmer ———
+      const heroIntro = gsap.timeline({ defaults: { ease: 'power3.out', overwrite: 'auto' } })
       heroIntro
-        .to('.hero__brand', { clipPath: 'inset(0 0 0% 0)', duration: 1.1 }, 0.15)
-        .to('.hero__headline', { opacity: 1, y: 0, duration: 0.85 }, 0.45)
-        .to('.hero__sub', { opacity: 1, y: 0, duration: 0.75 }, 0.6)
-        .to('.hero__actions', { opacity: 1, y: 0, duration: 0.7 }, 0.75)
-        .to('.hero__scroll', { opacity: 1, duration: 0.6 }, 1)
-        .fromTo('.hero__scroll-line', { scaleX: 0 }, { scaleX: 1, duration: 0.8 }, 1)
+        .fromTo('.nav', { y: -24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.8 }, 0)
+        .fromTo('.side-nav', { x: 28, opacity: 0 }, { x: 0, opacity: 1, duration: 0.9 }, 0.2)
+        .to('.hero__brand', { opacity: 1, y: 0, duration: 1.05 }, 0.15)
+        .to('.hero__headline', { opacity: 1, y: 0, duration: 0.85 }, 0.4)
+        .to('.hero__sub', { opacity: 1, y: 0, duration: 0.75 }, 0.55)
+        .to('.hero__actions', { opacity: 1, y: 0, duration: 0.7 }, 0.7)
+        .to('.hero__scroll', { opacity: 1, duration: 0.6 }, 0.95)
+        .fromTo('.hero__scroll-line', { scaleX: 0 }, { scaleX: 1, duration: 0.85 }, 0.95)
 
       if (!reduced) {
         gsap.to('.hero__media img', {
-          yPercent: 12,
+          yPercent: 14,
           ease: 'none',
           scrollTrigger: {
             trigger: '.hero',
@@ -133,29 +248,27 @@ function App() {
         })
       }
 
-      // ——— Marquee ———
       if (!reduced) {
         gsap.to('.marquee__track', {
           xPercent: -50,
           ease: 'none',
-          duration: 28,
+          duration: 26,
           repeat: -1,
         })
       }
 
-      // ——— Manifesto ———
       gsap.to('.manifesto__line span', {
         y: 0,
-        duration: reduced ? 0.2 : 0.95,
+        duration: reduced ? 0.2 : 1,
         ease: 'power3.out',
-        stagger: reduced ? 0 : 0.12,
+        stagger: reduced ? 0 : 0.14,
         scrollTrigger: {
           trigger: '.manifesto',
-          start: 'top 70%',
+          start: 'top 72%',
         },
       })
 
-      // ——— Sticky story ———
+      // Sticky story
       const slides = gsap.utils.toArray<HTMLElement>('.story__slide')
       const dots = gsap.utils.toArray<HTMLElement>('.story__dot')
 
@@ -167,60 +280,65 @@ function App() {
           scrollTrigger: {
             trigger: '.story',
             start: 'top top',
-            end: () => `+=${slides.length * 100}%`,
+            end: () => `+=${slides.length * 110}%`,
             pin: '.story__pin',
-            scrub: reduced ? false : 0.65,
+            scrub: reduced ? false : 0.7,
             anticipatePin: 1,
             onUpdate: (self) => {
               const idx = Math.min(
                 slides.length - 1,
                 Math.floor(self.progress * slides.length),
               )
-              slides.forEach((el, i) => {
-                el.classList.toggle('is-active', i === idx)
-              })
-              dots.forEach((el, i) => {
-                el.classList.toggle('is-active', i === idx)
-              })
+              slides.forEach((el, i) => el.classList.toggle('is-active', i === idx))
+              dots.forEach((el, i) => el.classList.toggle('is-active', i === idx))
             },
           },
         })
 
         slides.forEach((slide, i) => {
           const img = slide.querySelector('img')
+          const copy = slide.querySelector('.story__copy')
           if (img && !reduced) {
             storyTl.fromTo(
               img,
-              { yPercent: -4, scale: 1.08 },
-              { yPercent: 6, scale: 1, ease: 'none', duration: 1 },
+              { yPercent: -5, scale: 1.1, filter: 'brightness(0.7)' },
+              { yPercent: 7, scale: 1, filter: 'brightness(1)', ease: 'none', duration: 1 },
               i,
             )
           } else {
             storyTl.to({}, { duration: 1 }, i)
           }
+          if (copy && !reduced) {
+            storyTl.fromTo(
+              copy,
+              { y: 40, opacity: 0.2 },
+              { y: 0, opacity: 1, ease: 'none', duration: 0.8 },
+              i,
+            )
+          }
         })
       }
 
-      // ——— Punch ———
       if (!reduced) {
         gsap.fromTo(
           '.punch__text',
-          { scale: 0.82, opacity: 0.35 },
+          { scale: 0.78, opacity: 0.25, filter: 'blur(8px)' },
           {
             scale: 1,
             opacity: 1,
+            filter: 'blur(0px)',
             ease: 'none',
             scrollTrigger: {
               trigger: '.punch',
-              start: 'top 80%',
+              start: 'top 85%',
               end: 'center center',
               scrub: true,
             },
           },
         )
         gsap.to('.punch__bg img', {
-          yPercent: 10,
-          scale: 1.12,
+          yPercent: 12,
+          scale: 1.15,
           ease: 'none',
           scrollTrigger: {
             trigger: '.punch',
@@ -231,12 +349,9 @@ function App() {
         })
       }
 
-      // ——— Gallery horizontal ———
       const rail = document.querySelector<HTMLElement>('.gallery__rail')
       if (rail) {
-        const getScroll = () =>
-          Math.max(0, rail.scrollWidth - window.innerWidth + 48)
-
+        const getScroll = () => Math.max(0, rail.scrollWidth - window.innerWidth + 48)
         gsap.to(rail, {
           x: () => -getScroll(),
           ease: 'none',
@@ -245,19 +360,19 @@ function App() {
             start: 'top top',
             end: () => `+=${getScroll()}`,
             pin: true,
-            scrub: reduced ? false : 0.8,
+            scrub: reduced ? false : 0.85,
             invalidateOnRefresh: true,
             anticipatePin: 1,
           },
         })
-
         if (!reduced) {
           gsap.utils.toArray<HTMLElement>('.gallery__item img').forEach((img) => {
             gsap.fromTo(
               img,
-              { yPercent: -6 },
+              { yPercent: -8, scale: 1.08 },
               {
-                yPercent: 6,
+                yPercent: 8,
+                scale: 1,
                 ease: 'none',
                 scrollTrigger: {
                   trigger: '.gallery',
@@ -271,34 +386,49 @@ function App() {
         }
       }
 
-      // ——— Services reveal ———
       gsap.from('.services__item', {
         opacity: 0,
-        y: reduced ? 0 : 36,
-        duration: reduced ? 0.2 : 0.7,
-        stagger: 0.08,
+        y: reduced ? 0 : 42,
+        duration: reduced ? 0.2 : 0.75,
+        stagger: 0.1,
         ease: 'power2.out',
         scrollTrigger: {
           trigger: '.services__list',
-          start: 'top 80%',
+          start: 'top 78%',
         },
       })
 
-      // ——— CTA punctuate ———
       gsap.from('.cta__title', {
-        scale: reduced ? 1 : 0.92,
+        scale: reduced ? 1 : 0.9,
         opacity: 0,
-        duration: reduced ? 0.2 : 0.9,
+        y: reduced ? 0 : 30,
+        duration: reduced ? 0.2 : 1,
         ease: 'power3.out',
         scrollTrigger: {
           trigger: '.cta',
           start: 'top 75%',
         },
       })
+      gsap.from('.cta__sub, .cta__actions', {
+        opacity: 0,
+        y: reduced ? 0 : 24,
+        duration: reduced ? 0.2 : 0.8,
+        stagger: 0.12,
+        ease: 'power2.out',
+        scrollTrigger: {
+          trigger: '.cta',
+          start: 'top 70%',
+        },
+      })
 
       return () => {
         cancelAnimationFrame(rafId)
+        cancelAnimationFrame(cursorRaf)
         lenis?.destroy()
+        lenisRef.current = null
+        root.removeEventListener('click', onClick)
+        window.removeEventListener('pointermove', onMove)
+        document.documentElement.classList.remove('has-cursor')
       }
     }, rootRef)
 
@@ -306,8 +436,40 @@ function App() {
   }, [])
 
   return (
-    <div className="site" ref={rootRef}>
+    <div
+      className="site"
+      ref={rootRef}
+      style={
+        {
+          ['--mx' as string]: '50vw',
+          ['--my' as string]: '50vh',
+          ['--tilt-x' as string]: '0deg',
+          ['--tilt-y' as string]: '0deg',
+        }
+      }
+    >
+      <div className="spotlight" aria-hidden />
+      <div className="cursor" aria-hidden>
+        <span className="cursor__dot" />
+      </div>
       <div className="grain" aria-hidden />
+      <div className="progress" aria-hidden>
+        <div className="progress__fill" />
+      </div>
+
+      <nav className="side-nav" aria-label="Разделы сайта">
+        {SECTIONS.map((s) => (
+          <a
+            key={s.id}
+            className="side-nav__link"
+            href={`#${s.id}`}
+            data-section={s.id}
+          >
+            <span className="side-nav__num">{s.num}</span>
+            <span className="side-nav__label">{s.label}</span>
+          </a>
+        ))}
+      </nav>
 
       <header className="nav">
         <a className="nav__brand" href="#top">
@@ -324,7 +486,6 @@ function App() {
       </header>
 
       <main id="top">
-        {/* HERO */}
         <section className="hero" aria-label="Zaikovski — груминг на дому">
           <div className="hero__media">
             <img
@@ -335,6 +496,7 @@ function App() {
           </div>
           <div className="hero__veil" aria-hidden />
           <div className="hero__content">
+            <p className="hero__eyebrow">Home luxury grooming</p>
             <h1 className="hero__brand">
               Zaikovski
               <span>Studio</span>
@@ -353,13 +515,12 @@ function App() {
               </a>
             </div>
           </div>
-          <div className="hero__scroll" aria-hidden>
+          <a className="hero__scroll" href="#manifesto">
             <span className="hero__scroll-line" />
-            Scroll
-          </div>
+            Дальше
+          </a>
         </section>
 
-        {/* MARQUEE */}
         <div className="marquee" aria-hidden>
           <div className="marquee__track">
             {Array.from({ length: 2 }).flatMap((_, copy) =>
@@ -386,9 +547,8 @@ function App() {
           </div>
         </div>
 
-        {/* MANIFESTO */}
-        <section className="manifesto" aria-label="Манифест">
-          <p className="manifesto__label">Манифест</p>
+        <section className="manifesto" id="manifesto" aria-label="Манифест">
+          <p className="manifesto__label">02 — Манифест</p>
           <p className="manifesto__line">
             <span>Не везите.</span>
           </p>
@@ -403,7 +563,6 @@ function App() {
           </p>
         </section>
 
-        {/* STORY */}
         <section className="story" id="process" aria-label="Процесс">
           <div className="story__pin">
             <div className="story__slides">
@@ -434,7 +593,6 @@ function App() {
           </div>
         </section>
 
-        {/* PUNCH */}
         <section className="punch" aria-label="Лозунг">
           <div className="punch__bg">
             <img src={PHOTOS.punch} alt="" />
@@ -445,7 +603,6 @@ function App() {
           </h2>
         </section>
 
-        {/* GALLERY */}
         <section className="gallery" id="gallery" aria-label="Работы">
           <div className="gallery__head">
             <h2 className="gallery__title">
@@ -456,8 +613,7 @@ function App() {
               мурашки
             </h2>
             <p className="gallery__note">
-              Реальные кадры с выездов. Без стоков. Без фильтров «идеальной
-              жизни».
+              Скролль вбок — реальные кадры с выездов. Без стоков.
             </p>
           </div>
           <div className="gallery__rail">
@@ -472,9 +628,8 @@ function App() {
           </div>
         </section>
 
-        {/* SERVICES */}
         <section className="services" id="services" aria-label="Услуги">
-          <p className="services__label">Услуги</p>
+          <p className="services__label">05 — Услуги</p>
           <h2 className="services__title">Что делаем на выезде</h2>
           <ul className="services__list">
             {SERVICES.map((s, i) => (
@@ -490,10 +645,10 @@ function App() {
           </ul>
         </section>
 
-        {/* CTA */}
         <section className="cta" id="book" aria-label="Запись">
           <div className="cta__glow" aria-hidden />
           <div className="cta__inner">
+            <p className="cta__label">06 — Запись</p>
             <h2 className="cta__title">
               Хватит возить.
               <br />
@@ -524,7 +679,7 @@ function App() {
         <p>
           <strong>Zaikovski</strong> — груминг на дому
         </p>
-        <p>© {new Date().getFullYear()} · Сделано с характером</p>
+        <p>© {new Date().getFullYear()} · Private mobile atelier</p>
       </footer>
     </div>
   )
